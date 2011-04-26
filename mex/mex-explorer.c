@@ -19,6 +19,7 @@
 
 #include "mex-explorer.h"
 #include "mex-aggregate-model.h"
+#include "mex-view-model.h"
 #include "mex-column.h"
 #include "mex-content-box.h"
 #include "mex-content-proxy.h"
@@ -587,17 +588,19 @@ static gboolean
 transform_title_cb (GBinding *binding,
                     const GValue *source_value,
                     GValue *target_value,
-                    MexModel *model)
+                    MexViewModel *model)
 {
   gchar *new_target_value;
+  MexModel *orig_model = mex_view_model_get_model (model);
 
   new_target_value = g_strdup_printf ("%s (%d)",
                                       g_value_get_string (source_value),
-                                      mex_model_get_length (model));
+                                      mex_model_get_length (orig_model));
 
   g_value_set_string (target_value, new_target_value);
 
   g_free (new_target_value);
+  g_object_unref (orig_model);
 
  return TRUE;
 }
@@ -616,6 +619,7 @@ mex_explorer_model_added_cb (MexAggregateModel *aggregate,
                              MexModel          *model,
                              MexExplorer       *explorer)
 {
+  MexModel *view_model;
   MexProxy *proxy;
   gchar *placeholder_text;
   ClutterContainer *container;
@@ -624,6 +628,11 @@ mex_explorer_model_added_cb (MexAggregateModel *aggregate,
   gchar *title;
 
   MexExplorerPrivate *priv = explorer->priv;
+
+  view_model = mex_view_model_new (model);
+  if (priv->n_preview_items >= 0)
+    mex_view_model_set_limit (MEX_VIEW_MODEL (view_model),
+                              priv->n_preview_items);
 
   container = g_object_get_qdata (G_OBJECT (aggregate),
                                   mex_explorer_container_quark);
@@ -652,7 +661,7 @@ mex_explorer_model_added_cb (MexAggregateModel *aggregate,
                                  G_BINDING_SYNC_CREATE,
                                  (GBindingTransformFunc)transform_title_cb,
                                  NULL,
-                                 model,
+                                 view_model,
                                  NULL);
 
   g_signal_connect (model, "notify::length",
@@ -690,13 +699,11 @@ mex_explorer_model_added_cb (MexAggregateModel *aggregate,
     }
 
   /* Create the proxy to create objects for the column */
-  proxy = mex_content_proxy_new (model, CLUTTER_CONTAINER (column),
+  proxy = mex_content_proxy_new (view_model, CLUTTER_CONTAINER (column),
                                  MEX_TYPE_CONTENT_BOX);
   mex_content_proxy_set_stage (MEX_CONTENT_PROXY (proxy),
                                (ClutterStage *)clutter_actor_get_stage (
                                  CLUTTER_ACTOR (explorer)));
-  if (priv->n_preview_items >= 0)
-    mex_proxy_set_limit (proxy, priv->n_preview_items);
 
   /* Setup qdata and weak references so we can get references back to
    * the container/the explorer/the model and so that we can forward
@@ -726,7 +733,7 @@ mex_explorer_model_added_cb (MexAggregateModel *aggregate,
   g_object_weak_ref (G_OBJECT (column), mex_explorer_unset_container_cb, model);
 
   /* Start the proxy */
-  mex_proxy_start (proxy);
+  mex_view_model_start (MEX_VIEW_MODEL (view_model));
 }
 
 static void
@@ -895,7 +902,6 @@ mex_explorer_push_model (MexExplorer *explorer,
       g_signal_connect (proxy, "object-created",
                         G_CALLBACK (mex_explorer_grid_object_created_cb),
                         grid);
-      mex_proxy_start (proxy);
 
       /* Store the container on the model */
       g_object_set_qdata (G_OBJECT (model), mex_explorer_container_quark,
