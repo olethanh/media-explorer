@@ -432,8 +432,8 @@ mex_content_box_key_press_event_cb (ClutterActor    *actor,
         {
           MxAction *action = actions->data;
 
-          mex_action_set_content (action, priv->content);
           mex_action_set_context (action, priv->model);
+          mex_action_set_content (action, priv->content);
 
           g_signal_emit_by_name (action, "activated", 0);
 
@@ -501,8 +501,8 @@ mex_content_box_key_press_event_cb (ClutterActor    *actor,
                   button = mex_action_button_new (action);
 
                   mx_bin_set_fill (MX_BIN (button), TRUE, FALSE);
-                  mex_action_set_content (action, priv->content);
                   mex_action_set_context (action, priv->model);
+                  mex_action_set_content (action, priv->content);
                 }
 
                 clutter_container_add_actor (CLUTTER_CONTAINER (layout),
