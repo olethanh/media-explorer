@@ -720,6 +720,7 @@ mex_media_controls_init (MexMediaControls *self)
 #endif
 
   /* proxy setup */
+
   priv->model = MEX_VIEW_MODEL (mex_view_model_new (NULL));
   g_object_ref_sink (G_OBJECT (priv->model));
   /* FIXME: Set an arbitrary 200-item limit as we can't handle large
@@ -896,6 +897,7 @@ mex_media_controls_set_content (MexMediaControls *self,
                                 MexModel         *context)
 {
   MexMediaControlsPrivate *priv = self->priv;
+  MexModel *orig_model;
 
   g_return_if_fail (MEX_IS_CONTENT (content));
 
@@ -905,13 +907,17 @@ mex_media_controls_set_content (MexMediaControls *self,
 
   /* update the related strip */
   mex_view_model_stop (priv->model);
-  g_object_set (G_OBJECT (priv->model), "model", context, NULL);
+
+  orig_model = mex_model_get_model (context);
+  g_object_set (G_OBJECT (priv->model), "model", orig_model, NULL);
 
   mex_view_model_start_at_content (priv->model, priv->content, TRUE);
 
   /* Update content on the queue button */
   mex_content_view_set_content (MEX_CONTENT_VIEW (priv->queue_button),
                                 priv->content);
+
+  g_object_unref (orig_model);
 }
 
 void

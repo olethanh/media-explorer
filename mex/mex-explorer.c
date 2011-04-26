@@ -588,10 +588,10 @@ static gboolean
 transform_title_cb (GBinding *binding,
                     const GValue *source_value,
                     GValue *target_value,
-                    MexViewModel *model)
+                    MexModel *model)
 {
   gchar *new_target_value;
-  MexModel *orig_model = mex_view_model_get_model (model);
+  MexModel *orig_model = mex_model_get_model (model);
 
   new_target_value = g_strdup_printf ("%s (%d)",
                                       g_value_get_string (source_value),
