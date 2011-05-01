@@ -54,6 +54,7 @@ struct _MexMediaControlsPrivate
   MxAction *add_to_queue_action;
 
   MexContent *content;
+  MexModel   *model;
 
   ClutterEffect *vertical_effect;
   ClutterEffect *horizontal_effect;
@@ -67,7 +68,7 @@ struct _MexMediaControlsPrivate
   gpointer sort_data;
 
   MexProxy *proxy;
-  MexViewModel *model;
+  MexViewModel *proxy_model;
 };
 
 enum
@@ -153,10 +154,13 @@ mex_media_controls_dispose (GObject *object)
   MexMediaControls *self = MEX_MEDIA_CONTROLS (object);
   MexMediaControlsPrivate *priv = self->priv;
 
-  if (priv->proxy)
+  if (priv->media)
+    mex_media_controls_set_media (self, NULL);
+
+  if (priv->content)
     {
-      g_object_unref (priv->proxy);
-      priv->proxy = NULL;
+      g_object_unref (priv->content);
+      priv->content = NULL;
     }
 
   if (priv->model)
@@ -165,8 +169,17 @@ mex_media_controls_dispose (GObject *object)
       priv->model = NULL;
     }
 
-  if (priv->media)
-    mex_media_controls_set_media (self, NULL);
+  if (priv->proxy)
+    {
+      g_object_unref (priv->proxy);
+      priv->proxy = NULL;
+    }
+
+  if (priv->proxy_model)
+    {
+      g_object_unref (priv->proxy_model);
+      priv->proxy_model = NULL;
+    }
 
   if (priv->script)
     {
@@ -291,7 +304,9 @@ mex_media_controls_unmap (ClutterActor *actor)
   CLUTTER_ACTOR_CLASS (mex_media_controls_parent_class)->unmap (actor);
 
   clutter_actor_unmap (priv->vbox);
-  g_object_set (G_OBJECT (priv->model), "model", NULL, NULL);
+  g_object_set (G_OBJECT (priv->proxy_model), "model", NULL, NULL);
+  priv->model = NULL;
+  priv->content = NULL;
 }
 
 static void
@@ -721,14 +736,14 @@ mex_media_controls_init (MexMediaControls *self)
 
   /* proxy setup */
 
-  priv->model = MEX_VIEW_MODEL (mex_view_model_new (NULL));
-  g_object_ref_sink (G_OBJECT (priv->model));
+  priv->proxy_model = MEX_VIEW_MODEL (mex_view_model_new (NULL));
+  g_object_ref_sink (G_OBJECT (priv->proxy_model));
   /* FIXME: Set an arbitrary 200-item limit as we can't handle large
    *        amounts of actors without massive slow-down.
    */
-  mex_view_model_set_limit (priv->model, 200);
+  mex_view_model_set_limit (priv->proxy_model, 200);
 
-  priv->proxy = mex_content_proxy_new (MEX_MODEL (priv->model),
+  priv->proxy = mex_content_proxy_new (MEX_MODEL (priv->proxy_model),
                                        CLUTTER_CONTAINER (related_box),
                                        MEX_TYPE_CONTENT_TILE);
 
@@ -901,17 +916,31 @@ mex_media_controls_set_content (MexMediaControls *self,
 
   g_return_if_fail (MEX_IS_CONTENT (content));
 
+  if (priv->model == context)
+    {
+      if (priv->content == content)
+        return;
+
+      priv->content = content;
+
+      mex_view_model_set_content (priv->proxy_model, priv->content);
+      mex_media_controls_update_header (self);
+
+      return;
+    }
+
+  priv->model = context;
   priv->content = content;
 
   mex_media_controls_update_header (self);
 
   /* update the related strip */
-  mex_view_model_stop (priv->model);
+  mex_view_model_stop (priv->proxy_model);
 
   orig_model = mex_model_get_model (context);
-  g_object_set (G_OBJECT (priv->model), "model", orig_model, NULL);
+  g_object_set (G_OBJECT (priv->proxy_model), "model", orig_model, NULL);
 
-  mex_view_model_start_at_content (priv->model, priv->content, TRUE);
+  mex_view_model_start_at_content (priv->proxy_model, priv->content, TRUE);
 
   /* Update content on the queue button */
   mex_content_view_set_content (MEX_CONTENT_VIEW (priv->queue_button),
