@@ -358,6 +358,13 @@ mex_grilo_program_thumbnail (MexProgram *program, GrlMedia *media)
   const char *url;
   char *thumb_path;
 
+  const char *media_thumb_uri;
+  media_thumb_uri = grl_media_get_thumbnail (media);
+
+  if (media_thumb_uri)
+    if (g_str_has_prefix (media_thumb_uri, "http://"))
+      return;
+
   /* If the media isn't local, then we'll ignore it for now */
   url = grl_media_get_url (media);
   if (url == NULL || !g_str_has_prefix (url, "file:///"))
