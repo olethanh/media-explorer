@@ -881,7 +881,7 @@ mex_grid_allocate (ClutterActor           *actor,
                    const ClutterActorBox  *box,
                    ClutterAllocationFlags  flags)
 {
-  gint i, row;
+  gint i, row, first_visible_row;
   MxPadding padding;
   gdouble value, progress;
   ClutterActorBox child_box;
@@ -895,7 +895,6 @@ mex_grid_allocate (ClutterActor           *actor,
   CLUTTER_ACTOR_CLASS (mex_grid_parent_class)->allocate (actor, box, flags);
 
   /* Bail out if we have no children */
-  priv->first_visible = priv->last_visible = -1;
   if (!priv->children->len)
     return;
 
@@ -968,24 +967,36 @@ mex_grid_allocate (ClutterActor           *actor,
   do_second_phase = FALSE;
   bottom = top = padding.top;
   mex_grid_ensure_rows (self, box);
-  for (row = 0; row <= (priv->children->len - 1) / priv->real_stride; row++)
+
+  first_visible_row = MIN (priv->first_visible / priv->real_stride,
+                           priv->focused_row);
+  priv->first_visible = first_visible_row * priv->real_stride;
+
+  bottom = first_visible_row * (1.0 / pow (1.5, 2)) * basic_height;
+  top = bottom;
+
+  for (row = first_visible_row;
+       row <= (priv->children->len - 1) / priv->real_stride;
+       row++)
     {
       MexGridRowData *data =
         &g_array_index (priv->row_sizes, MexGridRowData, row);
       gdouble current_height = (data->target_height * progress) +
                                (data->initial_height * (1.0 - progress));
+      gint index = row * priv->real_stride;
 
       /* Check if we're visible */
       bottom = top + (gint)round (basic_height * current_height);
-      if ((bottom - value >= 0) && (top - value < box->y2 - box->y1))
+      if (bottom - value < 0)
         {
-          gint index = row * priv->real_stride;
+          priv->first_visible = index;
+        }
+      else if ((top - value) < (box->y2 - box->y1))
+        {
 
           /* Store the first visible child index, and the height at which
            * it's visible.
            */
-          if (priv->first_visible == -1)
-            priv->first_visible = index;
           priv->last_visible = MIN (priv->children->len - 1,
                                     index + (priv->real_stride - 1));
 
@@ -1052,9 +1063,6 @@ mex_grid_allocate (ClutterActor           *actor,
           /* Work out the allocation boxes */
           child_box.x1 = padding.left;
           do_spanning = FALSE;
-
-          if (priv->first_visible == -1)
-            priv->first_visible = index;
 
           for (i = index;
                (i < index + priv->real_stride) && (i < priv->children->len);
@@ -1301,7 +1309,7 @@ mex_grid_paint (ClutterActor *actor)
 
   CLUTTER_ACTOR_CLASS (mex_grid_parent_class)->paint (actor);
 
-  if (priv->first_visible == -1)
+  if (!priv->children->len)
     return;
 
   /* Clip our allocated area + padding */
