@@ -54,7 +54,6 @@ typedef struct
   ClutterStage *stage;
   ClutterActor *stack;
   ClutterActor *layout;
-  ClutterActor *tool_area;
   ClutterActor *explorer;
   ClutterActor *spinner;
   ClutterActor *version;
@@ -1850,8 +1849,7 @@ mex_plugin_loaded_cb (MexPluginManager *plugin_manager,
       for (t = (GList *)tools; t; t = t->next)
         {
           ClutterActor *tool = t->data;
-          clutter_container_add_actor (CLUTTER_CONTAINER (data->tool_area),
-                                       tool);
+          clutter_actor_set_parent (tool, CLUTTER_ACTOR (data->stage));
         }
 
       g_signal_connect (plugin, "present-actor",
@@ -2419,8 +2417,6 @@ main (int argc, char **argv)
   /* Create base widgets */
   data.layout = mx_box_layout_new ();
   clutter_actor_set_name (data.layout, "main-layout");
-  data.tool_area = mx_box_layout_new ();
-  clutter_actor_set_name (data.tool_area, "tool-area");
   data.explorer = mex_explorer_new ();
   clutter_actor_set_name (data.explorer, "main-explorer");
   g_signal_connect (data.explorer, "page-created",
